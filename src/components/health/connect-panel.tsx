@@ -1,91 +1,183 @@
-import { useState } from "react";
-import { Check, Copy, KeyRound, Link2 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
+import { Check, Copy, Link2, LogOut, RefreshCw, Circle as Ring, Watch } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { supabase } from "@/integrations/supabase/client";
+import { linkUltrahuman, startWhoopConnect, syncMyDevices } from "@/lib/health.functions";
 
-type Step = {
-  id: string;
-  provider: "Ultrahuman" | "WHOOP";
-  title: string;
-  detail: string;
-  needs: string[];
-  doc: string;
+type Props = {
+  ultrahumanEmail: string | null;
+  whoopConnected: boolean;
+  ultrahumanKeyReady: boolean;
+  whoopAppReady: boolean;
 };
 
-const steps: Step[] = [
-  {
-    id: "uh",
-    provider: "Ultrahuman",
-    title: "Partner API key + ring email",
-    detail:
-      "Ultrahuman's Vision partner API is a server-to-server key. Requests hit /api/v1/metrics?email=<ring account>&date=YYYY-MM-DD with the key in an Authorization header, returning sleep, HRV, temperature, steps and glucose for that day.",
-    needs: ["Partner API key", "Ring account email for each teammate"],
-    doc: "https://vision.ultrahuman.com/developer-docs?api=daily",
-  },
-  {
-    id: "whoop",
-    provider: "WHOOP",
-    title: "OAuth 2.0 app credentials",
-    detail:
-      "WHOOP uses per-user OAuth. Create an app in the WHOOP developer dashboard, add the redirect URL below, and each teammate authorises once with scopes read:recovery read:sleep read:workout read:cycles read:profile.",
-    needs: ["Client ID", "Client secret", "Redirect URL registered"],
-    doc: "https://developer.whoop.com/api/#section/Authentication",
-  },
-];
-
-export function ConnectPanel() {
+export function ConnectPanel({
+  ultrahumanEmail,
+  whoopConnected,
+  ultrahumanKeyReady,
+  whoopAppReady,
+}: Props) {
+  const qc = useQueryClient();
   const [copied, setCopied] = useState(false);
-  const redirect =
-    typeof window === "undefined" ? "/api/public/whoop/callback" : `${window.location.origin}/api/public/whoop/callback`;
+  const [redirect, setRedirect] = useState("/api/public/whoop/callback");
+  const [email, setEmail] = useState(ultrahumanEmail ?? "");
+
+  useEffect(() => {
+    setRedirect(`${window.location.origin}/api/public/whoop/callback`);
+  }, []);
+
+  const link = useServerFn(linkUltrahuman);
+  const startWhoop = useServerFn(startWhoopConnect);
+  const sync = useServerFn(syncMyDevices);
+
+  const linkRing = useMutation({
+    mutationFn: () => link({ data: { email } }),
+    onSuccess: async () => {
+      toast.success("Ring account saved — pulling today's metrics.");
+      await runSync.mutateAsync();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const runSync = useMutation({
+    mutationFn: () => sync({}),
+    onSuccess: (res) => {
+      const failed = res.results.filter((r) => !r.ok);
+      if (res.results.length === 0) toast.info("Link a device first.");
+      else if (failed.length === 0) toast.success("Synced.");
+      else failed.forEach((f) => toast.error(`${f.provider}: ${f.message}`));
+      void qc.invalidateQueries({ queryKey: ["team-data"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const connectWhoop = useMutation({
+    mutationFn: () => startWhoop({}),
+    onSuccess: (res) => {
+      window.location.href = res.authorizationUrl;
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
 
   return (
     <section className="panel p-5 sm:p-7" id="connect">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <span className="label-tag">Step 02 · Go live</span>
-          <h2 className="mt-2 text-2xl font-semibold">Connect the real devices</h2>
+          <span className="label-tag">Setup · your devices</span>
+          <h2 className="mt-2 text-2xl font-semibold">Connect your ring and band</h2>
           <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-            The dashboard above is running on a demo snapshot shaped exactly like the two APIs. To
-            swap in live data, three things have to come from your side — everything else is wired
-            for you.
+            Do this once. Nothing technical: type the email your Ultrahuman ring uses, tap the WHOOP
+            button and approve. Your keys stay on the server — never in the browser.
           </p>
         </div>
-        <Button variant="hero" onClick={() => toast.info("Send the credentials in chat and I'll wire live sync next.")}>
-          <KeyRound className="size-4" /> I have the credentials
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="panel" onClick={() => runSync.mutate()} disabled={runSync.isPending}>
+            <RefreshCw className={`size-4 ${runSync.isPending ? "animate-spin" : ""}`} /> Sync now
+          </Button>
+          <Button
+            variant="outline"
+            onClick={async () => {
+              await supabase.auth.signOut();
+              window.location.href = "/auth";
+            }}
+          >
+            <LogOut className="size-4" /> Sign out
+          </Button>
+        </div>
       </div>
 
       <div className="mt-6 grid gap-4 lg:grid-cols-2">
-        {steps.map((s) => (
-          <article key={s.id} className="rounded-xl border border-border bg-surface p-5">
-            <div className="flex items-center justify-between">
-              <span className="label-tag">{s.provider}</span>
-              <a
-                href={s.doc}
-                target="_blank"
-                rel="noreferrer"
-                className="label-tag inline-flex items-center gap-1 hover:text-foreground"
-              >
-                <Link2 className="size-3.5" /> Docs
-              </a>
-            </div>
-            <h3 className="mt-3 text-base font-semibold">{s.title}</h3>
-            <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{s.detail}</p>
-            <ul className="mt-4 space-y-2">
-              {s.needs.map((n) => (
-                <li key={n} className="flex items-center gap-2 text-sm">
-                  <Check className="size-4" style={{ color: "var(--recovery)" }} />
-                  {n}
-                </li>
-              ))}
-            </ul>
-          </article>
-        ))}
+        {/* Ultrahuman */}
+        <article className="rounded-xl border border-border bg-surface p-5">
+          <div className="flex items-center justify-between">
+            <span className="label-tag flex items-center gap-1.5">
+              <Ring className="size-3.5" style={{ color: "var(--glucose)" }} /> Ultrahuman Ring
+            </span>
+            <a
+              href="https://vision.ultrahuman.com/developer-docs?api=daily"
+              target="_blank"
+              rel="noreferrer"
+              className="label-tag inline-flex items-center gap-1 hover:text-foreground"
+            >
+              <Link2 className="size-3.5" /> Docs
+            </a>
+          </div>
+          <h3 className="mt-3 text-base font-semibold">
+            {ultrahumanEmail ? "Ring linked" : "Enter your ring account email"}
+          </h3>
+          <p className="mt-2 text-sm text-muted-foreground">
+            The email you use in the Ultrahuman app. We pull sleep, HRV, steps, temperature and
+            glucose for that account each day.
+          </p>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <Input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="you@example.com"
+              className="min-w-[14rem] flex-1"
+            />
+            <Button
+              variant="hero"
+              onClick={() => linkRing.mutate()}
+              disabled={linkRing.isPending || !email}
+            >
+              {ultrahumanEmail ? "Update" : "Link ring"}
+            </Button>
+          </div>
+          <StatusLine
+            ok={ultrahumanKeyReady}
+            okText="Partner API key installed"
+            pendingText="Waiting on the Ultrahuman partner API key (ask me to add it)"
+          />
+        </article>
+
+        {/* WHOOP */}
+        <article className="rounded-xl border border-border bg-surface p-5">
+          <div className="flex items-center justify-between">
+            <span className="label-tag flex items-center gap-1.5">
+              <Watch className="size-3.5" style={{ color: "var(--strain)" }} /> WHOOP
+            </span>
+            <a
+              href="https://developer.whoop.com/api/#section/Authentication"
+              target="_blank"
+              rel="noreferrer"
+              className="label-tag inline-flex items-center gap-1 hover:text-foreground"
+            >
+              <Link2 className="size-3.5" /> Docs
+            </a>
+          </div>
+          <h3 className="mt-3 text-base font-semibold">
+            {whoopConnected ? "WHOOP connected" : "Authorise your WHOOP account"}
+          </h3>
+          <p className="mt-2 text-sm text-muted-foreground">
+            One tap sends you to WHOOP's approval screen and straight back here with recovery, strain
+            and sleep flowing in.
+          </p>
+          <div className="mt-4">
+            <Button
+              variant={whoopConnected ? "panel" : "hero"}
+              onClick={() => connectWhoop.mutate()}
+              disabled={connectWhoop.isPending || !whoopAppReady}
+            >
+              {whoopConnected ? "Reconnect WHOOP" : "Connect WHOOP"}
+            </Button>
+          </div>
+          <StatusLine
+            ok={whoopAppReady}
+            okText="WHOOP app credentials installed"
+            pendingText="Waiting on WHOOP client ID + secret (ask me to add them)"
+          />
+        </article>
       </div>
 
       <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-surface p-4">
         <div>
-          <span className="label-tag">WHOOP redirect URL</span>
+          <span className="label-tag">WHOOP redirect URL (paste into your WHOOP app)</span>
           <p className="num mt-1 text-sm break-all text-foreground">{redirect}</p>
         </div>
         <Button
@@ -101,11 +193,26 @@ export function ConnectPanel() {
           {copied ? "Copied" : "Copy"}
         </Button>
       </div>
-
-      <p className="mt-4 text-xs text-muted-foreground">
-        Keys are never stored in the browser — when you hand them over they go into encrypted server
-        secrets and every device call runs server-side.
-      </p>
     </section>
+  );
+}
+
+function StatusLine({
+  ok,
+  okText,
+  pendingText,
+}: {
+  ok: boolean;
+  okText: string;
+  pendingText: string;
+}) {
+  return (
+    <p className="mt-4 flex items-center gap-2 text-xs text-muted-foreground">
+      <span
+        className="size-1.5 rounded-full"
+        style={{ background: ok ? "var(--recovery)" : "var(--strain)" }}
+      />
+      {ok ? okText : pendingText}
+    </p>
   );
 }
