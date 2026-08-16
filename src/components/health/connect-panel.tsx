@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Check, Copy, Link2, LogOut, RefreshCw, Ring, Watch } from "lucide-react";
+import { Check, Copy, Link2, LogOut, RefreshCw, Circle as Ring, Watch } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
