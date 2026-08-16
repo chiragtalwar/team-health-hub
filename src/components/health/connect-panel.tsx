@@ -35,8 +35,12 @@ const steps: Step[] = [
 
 export function ConnectPanel() {
   const [copied, setCopied] = useState(false);
-  const redirect =
-    typeof window === "undefined" ? "/api/public/whoop/callback" : `${window.location.origin}/api/public/whoop/callback`;
+  const [redirect, setRedirect] = useState("/api/public/whoop/callback");
+
+  useEffect(() => {
+    setRedirect(`${window.location.origin}/api/public/whoop/callback`);
+  }, []);
+
 
   return (
     <section className="panel p-5 sm:p-7" id="connect">
