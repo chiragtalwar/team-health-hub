@@ -14,7 +14,123 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      daily_metrics: {
+        Row: {
+          created_at: string
+          glucose_avg: number | null
+          hrv: number | null
+          id: string
+          metric_date: string
+          raw: Json | null
+          recovery: number | null
+          rhr: number | null
+          sleep_hours: number | null
+          sleep_score: number | null
+          source: string
+          steps: number | null
+          strain: number | null
+          temp_deviation: number | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          glucose_avg?: number | null
+          hrv?: number | null
+          id?: string
+          metric_date: string
+          raw?: Json | null
+          recovery?: number | null
+          rhr?: number | null
+          sleep_hours?: number | null
+          sleep_score?: number | null
+          source: string
+          steps?: number | null
+          strain?: number | null
+          temp_deviation?: number | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          glucose_avg?: number | null
+          hrv?: number | null
+          id?: string
+          metric_date?: string
+          raw?: Json | null
+          recovery?: number | null
+          rhr?: number | null
+          sleep_hours?: number | null
+          sleep_score?: number | null
+          source?: string
+          steps?: number | null
+          strain?: number | null
+          temp_deviation?: number | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      device_links: {
+        Row: {
+          access_token: string | null
+          connected_at: string
+          expires_at: string | null
+          id: string
+          provider: string
+          refresh_token: string | null
+          ultrahuman_email: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          access_token?: string | null
+          connected_at?: string
+          expires_at?: string | null
+          id?: string
+          provider: string
+          refresh_token?: string | null
+          ultrahuman_email?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          access_token?: string | null
+          connected_at?: string
+          expires_at?: string | null
+          id?: string
+          provider?: string
+          refresh_token?: string | null
+          ultrahuman_email?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          display_name: string
+          id: string
+          role_title: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          display_name?: string
+          id: string
+          role_title?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          display_name?: string
+          id?: string
+          role_title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
