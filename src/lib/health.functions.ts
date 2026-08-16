@@ -47,3 +47,10 @@ export const syncMyDevices = createServerFn({ method: "POST" })
     const { syncEverythingForUser } = await import("./health.queries.server");
     return syncEverythingForUser(context.userId);
   });
+
+export const getSetupStatus = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async () => ({
+    ultrahumanKey: Boolean(process.env["ULTRAHUMAN_API_KEY"]),
+    whoopApp: Boolean(process.env["WHOOP_CLIENT_ID"] && process.env["WHOOP_CLIENT_SECRET"]),
+  }));
